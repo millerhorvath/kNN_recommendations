@@ -4,7 +4,6 @@ import random
 import time
 import math
 from numpy import linalg as LA
-import matplotlib.pyplot as plt
 from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed
 # import post_diversification
@@ -221,7 +220,7 @@ class ItemKNN():
         movie_index = self.movieId_to_idx[movie_id]
         user_index = self.idx_to_userId[user_id]
 
-        return predict_par(item_similar, movie_index, user_index, self.item_user_matrix)
+        return predict_par(item_similar, movie_index, user_index, self.item_user_matrix, self.k)
 
 
     def item_similarity_sklearn(self, top_n):
