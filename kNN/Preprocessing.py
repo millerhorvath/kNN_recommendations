@@ -4,6 +4,7 @@ from numpy import linalg as LA
 import cPickle
 import random
 from scipy.stats import rv_discrete
+from sklearn import preprocessing
 
 
 def train_test_split(rate_df):
@@ -68,84 +69,84 @@ def train_test_split(rate_df):
     for user in all_users:
         print 'user', user
         X = rate_df[rate_df['userId'] == user][['userId', 'movieId', 'rating']]
-        if user % user_test_num != 0:
-        # if True == False:
-            for _, row in X.iterrows():
-                train.append([row['userId'], row['movieId'], row['rating']])
-        else:
+        # if user % user_test_num != 0:
+        # # if True == False:
+        #     for _, row in X.iterrows():
+        #         train.append([row['userId'], row['movieId'], row['rating']])
+        # else:
 
-            # print '-'*50
-            # print 'len of X for one user', len(X)
-            # print 'X', X
-            # print '-'*50
+        # print '-'*50
+        # print 'len of X for one user', len(X)
+        # print 'X', X
+        # print '-'*50
 
-            n_test_case = .2 * len(X)
-            test_cases = []
+        n_test_case = .2 * len(X)
+        test_cases = []
 
-            count = 0
-            print n_test_case
+        count = 0
+        print n_test_case
 
-            # items seen by this user
-            items_seen = X['movieId'].values.tolist()
-            small_sample_proba = []
-            for movieId in items_seen:
-                movieIdx = movieId_to_Index[movieId]
-                small_sample_proba.append(total_sample[movieIdx])
+        # items seen by this user
+        items_seen = X['movieId'].values.tolist()
+        small_sample_proba = []
+        for movieId in items_seen:
+            movieIdx = movieId_to_Index[movieId]
+            small_sample_proba.append(total_sample[movieIdx])
 
-            # normalize the small sample
-            small_sample_proba = np.array(small_sample_proba).reshape(1, -1)
-            small_sample_proba = preprocessing.normalize(small_sample_proba, norm='l1').flatten()
+        # normalize the small sample
+        small_sample_proba = np.array(small_sample_proba).reshape(1, -1)
+        small_sample_proba = preprocessing.normalize(small_sample_proba, norm='l1').flatten()
 
-            # in samples we have movieIDs not INDEX
+        # in samples we have movieIDs not INDEX
+        sample = rv_discrete(values=(items_seen, small_sample_proba)).rvs(size=n_test_case)
+        test_cases = list(set(sample))
+        while len(test_cases) < n_test_case:
             sample = rv_discrete(values=(items_seen, small_sample_proba)).rvs(size=n_test_case)
-            test_cases = list(set(sample))
-            while len(test_cases) < n_test_case:
-                sample = rv_discrete(values=(items_seen, small_sample_proba)).rvs(size=n_test_case)
-                test_cases = list(set(test_cases + list(sample)))
-                count += 1
+            test_cases = list(set(test_cases + list(sample)))
+            count += 1
 
-                if count > 500:
-                    break
-                # print small_sample_proba
-                # print sample
-                # print test_cases
-                # print n_test_case
-                # print '-'*20
-            for _, row in X.iterrows():
-                if row['movieId'] in test_cases:
-                    test.append([row['userId'], row['movieId'], row['rating']])
-                else:
-                    train.append([row['userId'], row['movieId'], row['rating']])
-            # print '='*20
-
-            # while len(test_cases) < n_test_case:
-            #     count += 1
-            #     start = timeit.default_timer()
-            #     test_case = draw_item(movie_select_sample, X['movieId'].values.tolist())
-            #     end = timeit.default_timer()
-            #     print 'draw', end - start
-            #
-            #     # print 'test drawn', test_case
-            #     if test_case not in test_cases:
-            #         # start = timeit.default_timer()
-            #         movie_select_sample = dec_sample_proba(movie_select_sample, test_case)
-            #         # end = timeit.default_timer()
-            #         # print 'dec sample', end - start
-            #         test_cases.append(test_case)
-
+            if count > 500:
+                break
+            # print small_sample_proba
+            # print sample
             # print test_cases
-            # print 'count', count
+            # print n_test_case
             # print '-'*20
-            # test cases are movie Ids, so we need to separate train and test tuples(userId, movieId, rating)
+        for _, row in X.iterrows():
+            if row['movieId'] in test_cases:
+                test.append([row['userId'], row['movieId'], row['rating']])
+            else:
+                train.append([row['userId'], row['movieId'], row['rating']])
+        # print '='*20
+
+        # while len(test_cases) < n_test_case:
+        #     count += 1
+        #     start = timeit.default_timer()
+        #     test_case = draw_item(movie_select_sample, X['movieId'].values.tolist())
+        #     end = timeit.default_timer()
+        #     print 'draw', end - start
+        #
+        #     # print 'test drawn', test_case
+        #     if test_case not in test_cases:
+        #         # start = timeit.default_timer()
+        #         movie_select_sample = dec_sample_proba(movie_select_sample, test_case)
+        #         # end = timeit.default_timer()
+        #         # print 'dec sample', end - start
+        #         test_cases.append(test_case)
+
+        # print test_cases
+        # print 'count', count
+        # print '-'*20
+        # test cases are movie Ids, so we need to separate train and test tuples(userId, movieId, rating)
 
 
-            # if user > 11:
-            #     return
+        # if user > 11:
+        #     return
 
-            # print '-'*100
-            # print train
-            # print '-' * 100
-            # print test
+        # print '-'*100
+        # print train
+        # print '-' * 100
+        # print test
 
     # print '='*200
     # print 'Movie select sample:'
