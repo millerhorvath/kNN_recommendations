@@ -16,6 +16,13 @@ This is a ItemKNN method.
 rating data is only based on training. There is no test data here.
 We just get training. Compute the item-item similarity matrix.
 and then get the recommendations(items)
+
+Usage:
+
+item_knn_obj = ItemKNN(k , rating_file_name, has_header, n_jobs_parallel)
+item_similar = item_knn_obj.compute_similarity_matrix(1, top_n, False, False, True)
+predicted_rating = item_knn_obj.predict(user_id, movie_id, item_similar)
+
 """
 
 
@@ -137,6 +144,7 @@ class ItemKNN():
         :param _k: k nearest neighbors
         :param rating_file_path: file name + path for the "user,item,rating" file; This is only training data
         :param has_header: Does the rating file has header
+        :param n_jobs: number of threads to use
         """
 
         print 'ItemKNN init'
