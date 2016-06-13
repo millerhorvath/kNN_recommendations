@@ -241,6 +241,8 @@ class ItemKNN():
                 sim_list.append([nei_index, sim])
             item_similars[item_idx] = sim_list[:]
 
+        return item_similars
+
         # pkl.dump(item_similars, open(self.item_similar_file_path, 'wb'))
 
 
@@ -274,17 +276,17 @@ class ItemKNN():
 
             if is_sklearn_kNN_sim:
                 print 'Computing sk-learn kNN similarity...'
-                self.item_similarity_sklearn(top_n)
+                item_similar = self.item_similarity_sklearn(top_n)
                 # print 'Done!!'
 
             else:
                 print 'Computing item-item similarity...'
                 raise Exception('THERE IS NO IMPLEMENTATION OF ITEM_SIMILARITY (removed)!!')
                 # self.user_similarity(top_n)
-
-        print 'Loading user-user similarity from file...'
-        raise Exception('Nothing saved!! We do NOT save anything in file in this implementation.')
-        # item_similar = pkl.load(open(self.item_similar_file_path, 'rb'))
+        else:
+            print 'Loading user-user similarity from file...'
+            raise Exception('Nothing saved!! We do NOT save anything in file in this implementation.')
+            # item_similar = pkl.load(open(self.item_similar_file_path, 'rb'))
 
         return item_similar
 
