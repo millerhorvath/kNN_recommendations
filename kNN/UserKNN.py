@@ -3,6 +3,7 @@ import numpy as np
 import cPickle as pkl
 import random
 import time
+from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed
 # import post_diversification
 # import evaluate
@@ -228,44 +229,52 @@ class UserKNN():
         return user_similars
 
 
-    def predict(self, user_similar, userId, movie_index):
+    def predict(self, user_id, movie_id, item_similar):
+        movie_index = self.movieId_to_idx[movie_id]
+        user_index = self.idx_to_userId[user_id]
 
-        sum_rates = 0.0
-        sum_similarity = 0.0
-        count_neighbors = 0
-        for sim_list in user_similar[userId]:
-            # sim_list = [[user_id, simVal], [...]]
-            count_neighbors += 1
+        return predict_par(item_similar, movie_index, user_index, self.user_item_matrix)
 
-            # neighbor rating for this movieId
-            nei_user_id = sim_list[0]
-            nei_similarity = sim_list[1]
-            nei_user_index = self.userId_to_idx[nei_user_id]
-            neighbor_rate = self.user_item_matrix[nei_user_index, movie_index]
-            # if float(neighbor_rate) <= 5.1:
-            #     print type(neighbor_rate)
-            #     print 'rating value', neighbor_rate
-            #     raise Exception('Suspicious neighbor rate; out of bound [1,5] !!')
 
-            if neighbor_rate > 0:
-                sum_rates += neighbor_rate * nei_similarity
-                sum_similarity += nei_similarity
 
-            if count_neighbors == self.k:
-                break
-
-        pred_rate = 0
-        if sum_rates > 0:
-            pred_rate = sum_rates / float(sum_similarity)
-
-        # print 'pred_rate', pred_rate
-
-        if pred_rate > 5.1:
-            movieId = self.idx_to_movieId[movie_index]
-            raise Exception('prediction rates should NOT be larger than 5.0!! '
-                            'but for user=%d and item=%d the prediction rate=%.3f.' % (userId, movieId, pred_rate))
-
-        return pred_rate
+    # def predict(self, user_similar, userId, movie_index):
+    #
+    #     sum_rates = 0.0
+    #     sum_similarity = 0.0
+    #     count_neighbors = 0
+    #     for sim_list in user_similar[userId]:
+    #         # sim_list = [[user_id, simVal], [...]]
+    #         count_neighbors += 1
+    #
+    #         # neighbor rating for this movieId
+    #         nei_user_id = sim_list[0]
+    #         nei_similarity = sim_list[1]
+    #         nei_user_index = self.userId_to_idx[nei_user_id]
+    #         neighbor_rate = self.user_item_matrix[nei_user_index, movie_index]
+    #         # if float(neighbor_rate) <= 5.1:
+    #         #     print type(neighbor_rate)
+    #         #     print 'rating value', neighbor_rate
+    #         #     raise Exception('Suspicious neighbor rate; out of bound [1,5] !!')
+    #
+    #         if neighbor_rate > 0:
+    #             sum_rates += neighbor_rate * nei_similarity
+    #             sum_similarity += nei_similarity
+    #
+    #         if count_neighbors == self.k:
+    #             break
+    #
+    #     pred_rate = 0
+    #     if sum_rates > 0:
+    #         pred_rate = sum_rates / float(sum_similarity)
+    #
+    #     # print 'pred_rate', pred_rate
+    #
+    #     if pred_rate > 5.1:
+    #         movieId = self.idx_to_movieId[movie_index]
+    #         raise Exception('prediction rates should NOT be larger than 5.0!! '
+    #                         'but for user=%d and item=%d the prediction rate=%.3f.' % (userId, movieId, pred_rate))
+    #
+    #     return pred_rate
 
 
     def compute_similarity_matrix(self, low_dim, top_n, is_sim_infile, is_use_low_dim, is_sklearn_kNN_sim):
