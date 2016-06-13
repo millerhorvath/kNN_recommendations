@@ -7,6 +7,7 @@ from scipy.stats import rv_discrete
 from sklearn import preprocessing
 
 
+
 def train_test_split(rate_df):
     print 'train_test split...'
     all_users = pd.unique(rate_df.userId.ravel())
