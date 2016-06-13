@@ -208,6 +208,12 @@ class ItemKNN():
 
         # print 'Done!!'
 
+    def predict(self, user_id, movie_id, item_similar):
+        movie_index = self.movieId_to_idx[movie_id]
+        user_index = self.idx_to_userId[user_id]
+
+        return predict_par(item_similar, movie_index, user_index, self.item_user_matrix)
+
 
     def item_similarity_sklearn(self, top_n):
         # minkowski
@@ -226,7 +232,7 @@ class ItemKNN():
                 sim_list.append([nei_index, sim])
             item_similars[item_idx] = sim_list[:]
 
-        pkl.dump(item_similars, open(self.item_similar_file_path, 'wb'))
+        # pkl.dump(item_similars, open(self.item_similar_file_path, 'wb'))
 
 
     def compute_similarity_matrix(self, low_dim, top_n, is_sim_infile, is_use_low_dim, is_sklearn_kNN_sim):
