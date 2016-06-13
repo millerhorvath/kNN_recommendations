@@ -135,7 +135,7 @@ def recommend_one(user_id, top_n, user_similar, movies_num, userId_to_idx, user_
 
 class UserKNN():
 
-    def __init__(self, _k, rating_file_path, has_header):
+    def __init__(self, _k, rating_file_path, has_header, n_jobs):
         """
             :param _k: k nearest neighbors
             :param rating_file_path: file name + path for the "user,item,rating" file; This is only training data
@@ -148,6 +148,7 @@ class UserKNN():
         """ rate_df is ONLY the training part. Not test set!! """
         # self.rate_df = _rate_df
         self.k = _k
+        self.n_jobs = n_jobs
         self.has_header = has_header
 
         self.user_item_matrix_low = None
@@ -208,7 +209,7 @@ class UserKNN():
 
     def user_similarity_sklearn(self, top_n):
         # minkowski
-        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=10).\
+        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=self.n_jobs).\
             fit(self.user_item_matrix)
         # indices for nearest neighbors and their distances
         distances, indices = nbrs.kneighbors(self.user_item_matrix)
@@ -342,7 +343,7 @@ class UserKNN():
         return nonzero_movie_index
 
 
-    def recommend_all(self, top_n, user_similar):
+    def recommend_all(self, top_n, user_similar, rec_to_file_name):
         print 'Item recommendation...'
 
         """
@@ -361,7 +362,7 @@ class UserKNN():
         # for user_id in self.all_users:
         _all_users = self.all_users
         # backend = "threading"
-        user_recs_par = Parallel(n_jobs=15, backend="threading", verbose=0, max_nbytes="900M")\
+        user_recs_par = Parallel(n_jobs=self.n_jobs, backend="threading", verbose=0, max_nbytes="100M")\
             (delayed(recommend_one)(user_id, top_n, user_similar,
                                                                     self.movies_num, self.userId_to_idx,
                                                                     self.user_item_matrix,
@@ -372,6 +373,6 @@ class UserKNN():
 
         for r in user_recs_par:
             user_recs[r[0]] = r[1]
-        # pkl.dump(user_recs, open(self.user_recs_file_path, 'wb'))
+        pkl.dump(user_recs, open(rec_to_file_name, 'wb'))
         return user_recs
 

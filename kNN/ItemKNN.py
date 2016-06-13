@@ -132,7 +132,7 @@ def recommend_one(movie_index, top_n, item_similar, user_num, item_user_matrix, 
 
 class ItemKNN():
 
-    def __init__(self, _k, rating_file_path, has_header):
+    def __init__(self, _k, rating_file_path, has_header, n_jobs):
         """
         :param _k: k nearest neighbors
         :param rating_file_path: file name + path for the "user,item,rating" file; This is only training data
@@ -146,6 +146,7 @@ class ItemKNN():
         # self.rate_df = _rate_df
 
         self.k = _k
+        self.n_jobs = n_jobs
         self.has_header = has_header
 
         # self.item_user_matrix = None
@@ -217,7 +218,7 @@ class ItemKNN():
 
     def item_similarity_sklearn(self, top_n):
         # minkowski
-        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=10).\
+        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=self.n_jobs).\
             fit(self.item_user_matrix)
         # indices for nearest neighbors and their distances
         distances, indices = nbrs.kneighbors(self.item_user_matrix)
