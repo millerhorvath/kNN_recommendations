@@ -218,14 +218,26 @@ class ItemKNN():
 
     def predict(self, user_id, movie_id, item_similar):
         movie_index = self.movieId_to_idx[movie_id]
-        user_index = self.idx_to_userId[user_id]
+        user_index = self.movieId_to_idx[user_id]
 
-        return predict_par(item_similar, movie_index, user_index, self.item_user_matrix, self.k)
+        print 'movie_index', movie_index
+        print 'user index', user_index
+
+        rating = predict_par(item_similar, movie_index, user_index, self.item_user_matrix, self.k)
+        if rating == 0:
+            # mean ratings of this item based on user-item index
+            mean_rating_item = np.mean(self.item_user_matrix[movie_index][self.item_user_matrix[movie_index].nonzero()[0]])
+
+            # print self.item_user_matrix[self.item_user_matrix[movie_index].nonzero()]
+            print 'This is average rating.'
+            return mean_rating_item
+        return rating
+
 
 
     def item_similarity_sklearn(self, top_n):
         # minkowski
-        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=self.n_jobs).\
+        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='dice', n_jobs=self.n_jobs).\
             fit(self.item_user_matrix)
         # indices for nearest neighbors and their distances
         distances, indices = nbrs.kneighbors(self.item_user_matrix)
