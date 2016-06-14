@@ -178,8 +178,8 @@ class ItemKNN():
             f.readline()
         for line in f:
             spline = line.split(',')
-            user.append(int(spline[0]))
-            item.append(int(spline[1]))
+            user.append(int(float(spline[0])))
+            item.append(int(float(spline[1])))
 
         self.all_users = list(set(user))
         self.all_movies = list(set(item))
@@ -209,8 +209,8 @@ class ItemKNN():
             f.readline()
         for line in f:
             spline = line.split(',')
-            userIndex = self.userId_to_idx[int(spline[0])]
-            movieIndex = self.movieId_to_idx[int(spline[1])]
+            userIndex = self.userId_to_idx[int(float(spline[0]))]
+            movieIndex = self.movieId_to_idx[int(float(spline[1]))]
             self.item_user_matrix[movieIndex, userIndex] = float(spline[2])
 
 
@@ -237,7 +237,7 @@ class ItemKNN():
 
     def item_similarity_sklearn(self, top_n):
         # minkowski
-        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='dice', n_jobs=self.n_jobs).\
+        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=self.n_jobs).\
             fit(self.item_user_matrix)
         # indices for nearest neighbors and their distances
         distances, indices = nbrs.kneighbors(self.item_user_matrix)
