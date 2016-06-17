@@ -6,6 +6,7 @@ import math
 from numpy import linalg as LA
 from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed
+import math
 # import post_diversification
 # import evaluate
 
@@ -155,6 +156,8 @@ class ItemKNN():
         self.k = _k
         self.n_jobs = n_jobs
         self.has_header = has_header
+        
+        self.cov_error = 0
 
         # self.item_user_matrix = None
         self.item_user_matrix_low = None
@@ -176,11 +179,19 @@ class ItemKNN():
         item = []
         if self.has_header:
             f.readline()
+            
+	self.all_movies_avg = 0.0
+	count = 0
+		
         for line in f:
             spline = line.split(',')
-            user.append(int(float(spline[0])))
-            item.append(int(float(spline[1])))
-
+            user.append(int(spline[0]))
+            item.append(int(spline[1]))
+            self.all_movies_avg += float(spline[2])
+            count = count + 1
+            
+        self.all_movies_avg /= float(count)
+        
         self.all_users = list(set(user))
         self.all_movies = list(set(item))
 
@@ -201,43 +212,148 @@ class ItemKNN():
         for i in range(self.user_num):
             self.idx_to_userId[i] = self.all_users[i]
             self.userId_to_idx[self.all_users[i]] = i
-
-
+		
         self.item_user_matrix = np.zeros((self.movies_num, self.user_num), dtype=float)
-        f = open(file_path, 'r')
+        
+	f = open(file_path, 'r')
         if self.has_header:
             f.readline()
+		
         for line in f:
             spline = line.split(',')
-            userIndex = self.userId_to_idx[int(float(spline[0]))]
-            movieIndex = self.movieId_to_idx[int(float(spline[1]))]
+            userIndex = self.userId_to_idx[int(spline[0])]
+            movieIndex = self.movieId_to_idx[int(spline[1])]
             self.item_user_matrix[movieIndex, userIndex] = float(spline[2])
-
 
         # print 'Done!!'
 
     def predict(self, user_id, movie_id, item_similar):
-        movie_index = self.movieId_to_idx[movie_id]
-        user_index = self.movieId_to_idx[user_id]
-
-        print 'movie_index', movie_index
-        print 'user index', user_index
-
-        rating = predict_par(item_similar, movie_index, user_index, self.item_user_matrix, self.k)
-        if rating == 0:
-            # mean ratings of this item based on user-item index
-            mean_rating_item = np.mean(self.item_user_matrix[movie_index][self.item_user_matrix[movie_index].nonzero()[0]])
-
-            # print self.item_user_matrix[self.item_user_matrix[movie_index].nonzero()]
-            print 'This is average rating.'
-            return mean_rating_item
-        return rating
-
-
+        movie_error_flag = False
+        user_error_flag = False
+	
+	# Dealing with movie coverage error
+	try:
+	   movie_index = self.movieId_to_idx[movie_id]
+	except KeyError:
+	   movie_error_flag = True
+	
+	
+	
+	# Dealing with user coverage error
+	try:
+	   user_index = self.userId_to_idx[user_id]
+	except:
+	   movie_error_flag = True
+	
+	
+	
+	if movie_error_flag == True:
+	   self.cov_error = self.cov_error + 1
+	   #try:
+	   #    print 'Movie Coverage Error'
+	   #except:
+	   #    pass
+	       
+	   return self.all_movies_avg
+	   #return 'Movie Coverage Error'
+	elif user_error_flag == True:
+	   self.cov_error = self.cov_error + 1
+	   #try:
+	   #    print 'User Coverage Error'
+	   #except:
+	   #    pass
+	       
+	   return self.all_movies_avg
+	   #return 'User Coverage Error'
+	else:
+	   #try:
+	   #    print 'movie_index', movie_index
+	   #    print 'user index', user_index
+	   #except:
+	   #    pass
+	   
+	   
+	   rating = predict_par(item_similar, movie_index, user_index, self.item_user_matrix, self.k)
+	   if rating == 0:
+	       self.cov_error = self.cov_error + 1
+	       
+	       # mean ratings of this item based on user-item index
+	       mean_rating_item = np.mean(self.item_user_matrix[movie_index][self.item_user_matrix[movie_index].nonzero()[0]])
+	       
+	       # print self.item_user_matrix[self.item_user_matrix[movie_index].nonzero()]
+	       #print 'This is average rating.'
+	       return mean_rating_item
+	   return rating
+        
+    def root_mean_squared_error(self, test_file_path, has_header, out_file_eval, item_similar):
+        print ("Computing Root Mean Squared Error...")
+        
+        # Reading Testing Data Set File
+        f = open(test_file_path, "r")
+        
+        if has_header:
+            f.readline()
+        
+        inFile = f.readlines()
+        
+        f.close()
+        
+        
+        rmse_sum = 0.0 # sum of the squared difference between observed and predicted ratings
+        mae_sum = 0.0 # sum of the posite diference between observed and predicted ratings
+        n = 0 # conunting number of ratings in training set
+        
+		# Predicting a rating for all entries into testing dataset
+        for i in range(len(inFile)):
+            inFile[i] = inFile[i].split(",")
+            
+            # Converting data to the proper data type
+            for j in range(len(inFile[i]) - 1):
+                inFile[i][j] = int(inFile[i][j])
+            inFile[i][2] = float(inFile[i][2])
+            
+            # Getting prediction given a user and an item
+            inFile[i].append(self.predict(inFile[i][0], inFile[i][1], item_similar))
+            
+            # RMSE summing
+            rmse_sum += ((inFile[i][3] - inFile[i][2]) * (inFile[i][3] - inFile[i][2]))
+            
+            # MAE summing
+            mae_sum += math.fabs(inFile[i][3] - inFile[i][2])
+            
+            # counting
+            n = n + 1
+        
+        rmse = math.sqrt(rmse_sum / float(n)) # RMSE
+        
+        mae = mae_sum / float(n) # MAE
+        
+        coverage = (float(n) - float(self.cov_error)) / float(n) # Coverage
+        
+		# Writing fold evaluation on file
+        f = open(out_file_eval, "w")
+		
+        f.write("RMSE:,{}\n".format(rmse))
+        f.write("MAE:,{}\n".format(mae))
+        #print ("Number of inaccurate predictions: {}".format(self.cov_error))
+        #print ("Number of prediction attempts: {}".format(n))
+        f.write("Coverage:,{}\n".format(coverage))
+		
+        f.write("userId,movieId,rating, pred_rating\n")
+        
+        for i in inFile:
+            for j in range(len(i)):
+                i[j] = str(i[j])
+            f.write(",".join(i))
+            f.write("\n")
+        
+        f.close()
+        
+        return (rmse, mae, coverage)
 
     def item_similarity_sklearn(self, top_n):
         # minkowski
-        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='euclidean', n_jobs=self.n_jobs).\
+        nbrs = NearestNeighbors(n_neighbors=top_n+1, algorithm='ball_tree', metric='dice', n_jobs=self.n_jobs).\
             fit(self.item_user_matrix)
         # indices for nearest neighbors and their distances
         distances, indices = nbrs.kneighbors(self.item_user_matrix)
@@ -257,7 +373,7 @@ class ItemKNN():
         # pkl.dump(item_similars, open(self.item_similar_file_path, 'wb'))
 
 
-    def compute_similarity_matrix(self, low_dim, top_n, is_sim_infile, is_use_low_dim, is_sklearn_kNN_sim):
+    def compute_similarity_matrix(self, low_dim, top_n, is_sim_infile, is_use_low_dim, is_sklearn_kNN_sim, item_similar_file_path = ""):
         """
         Usage:
         item_similar = compute_similarity_matrix(1, top_n, False, False, True)
@@ -296,12 +412,13 @@ class ItemKNN():
                 # self.user_similarity(top_n)
         else:
             print 'Loading user-user similarity from file...'
-            raise Exception('Nothing saved!! We do NOT save anything in file in this implementation.')
-            # item_similar = pkl.load(open(self.item_similar_file_path, 'rb'))
+            #raise Exception('Nothing saved!! We do NOT save anything in file in this implementation.')
+            item_similar = pkl.load(open(item_similar_file_path, 'rb'))
 
         return item_similar
-
-
+        
+        
+    
     def recommend_all(self, top_n, item_similar, rec_to_file_name):
         print 'Item recommendation...'
 
