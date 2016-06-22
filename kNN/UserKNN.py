@@ -5,7 +5,6 @@ import random
 import time
 from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed
-import math
 # import post_diversification
 # import evaluate
 
@@ -18,7 +17,7 @@ and then get the recommendations(items)
 """
 
 
-def find_neighbors_items_par(userId, user_similar, movies_num, user_item_matrix, k):
+def find_neighbors_items_par(userId, user_similar, movies_num, userId_to_idx, user_item_matrix, k):
     sum_vec_items = np.zeros((movies_num), dtype=float)
     count_neighbors = 0
     for sim_list in user_similar[userId]:
@@ -28,8 +27,8 @@ def find_neighbors_items_par(userId, user_similar, movies_num, user_item_matrix,
         # neighbor rating for this movieId
         nei_user_id = sim_list[0]
         # nei_similarity = sim_list[1]
-        #nei_user_index = userId_to_idx[nei_user_id]
-        sum_vec_items += user_item_matrix[nei_user_id]
+        nei_user_index = userId_to_idx[nei_user_id]
+        sum_vec_items += user_item_matrix[nei_user_index]
 
         if count_neighbors == k:
             break
@@ -39,19 +38,19 @@ def find_neighbors_items_par(userId, user_similar, movies_num, user_item_matrix,
     return nonzero_movie_index
 
 
-def predict_par(user_similar, movie_index, user_index, user_item_matrix, k):
+def predict_par(user_similar, userId, movie_index, userId_to_idx, user_item_matrix, idx_to_movieId, k):
     sum_rates = 0.0
     sum_similarity = 0.0
     count_neighbors = 0
-    for sim_list in user_similar[user_index]:
+    for sim_list in user_similar[userId]:
         # sim_list = [[user_id, simVal], [...]]
         count_neighbors += 1
 
         # neighbor rating for this movieId
         nei_user_id = sim_list[0]
         nei_similarity = sim_list[1]
-        #nei_user_index = userId_to_idx[nei_user_id]
-        neighbor_rate = user_item_matrix[nei_user_id, movie_index]
+        nei_user_index = userId_to_idx[nei_user_id]
+        neighbor_rate = user_item_matrix[nei_user_index, movie_index]
         # if float(neighbor_rate) <= 5.1:
         #     print type(neighbor_rate)
         #     print 'rating value', neighbor_rate
@@ -70,37 +69,35 @@ def predict_par(user_similar, movie_index, user_index, user_item_matrix, k):
 
     # print 'pred_rate', pred_rate
 
-    #if pred_rate > 5.1:
-    #    movieId = idx_to_movieId[movie_index]
-    #    raise Exception('prediction rates should NOT be larger than 5.0!! '
-    #                    'but for user=%d and item=%d the prediction rate=%.3f.' % (userId, movieId, pred_rate))
+    if pred_rate > 5.1:
+        movieId = idx_to_movieId[movie_index]
+        raise Exception('prediction rates should NOT be larger than 5.0!! '
+                        'but for user=%d and item=%d the prediction rate=%.3f.' % (userId, movieId, pred_rate))
 
     return pred_rate
 
 
-def recommend_one(user_index, top_n, user_similar, movies_num, user_item_matrix, k):
-                #idx_to_movieId, k, all_movies, movieId_to_idx):
+def recommend_one(user_id, top_n, user_similar, movies_num, userId_to_idx, user_item_matrix,
+                idx_to_movieId, k, all_movies, movieId_to_idx):
+
 
     # print 'user id', user_id
-    # user_index = userId_to_idx[user_id]
+    user_index = userId_to_idx[user_id]
     predictions = []
-
-
 
     # find non-zero movie rates for the neighbors of this user.
     # Not all items are going to get a rate(non-zero prediction). Only those items that the neighbors
     # of this user has seen are considered as non-zero prediction rates.
-    neighbors_movies_index = find_neighbors_items_par(user_index, user_similar,
-                                                       movies_num, user_item_matrix, k)
+    neighbors_movies_index = find_neighbors_items_par(user_id, user_similar,
+                                                                 movies_num, userId_to_idx,
+                                                                 user_item_matrix, k)
     # userId, user_similar, movies_num, userId_to_idx, user_item_matrix, k
     # neighbors_movies_index = []
 
     # this user's mean rating for all items
     user_mean_rate = np.mean(user_item_matrix[user_index])
 
-
-
-    user_rates = np.zeros(movies_num)
+    user_rates = np.zeros((len(all_movies)))
     user_rates.fill(user_mean_rate)
 
     # if len(neighbors_movies_index) < top_n:
@@ -111,16 +108,17 @@ def recommend_one(user_index, top_n, user_similar, movies_num, user_item_matrix,
         # movie_id = idx_to_movieId[movie_index]
 
         if user_item_matrix[user_index, movie_index] == 0:
-            pred_rate = predict_par(user_similar, movie_index, user_index, user_item_matrix, k)
+            pred_rate = predict_par(user_similar, user_id, movie_index, userId_to_idx,
+                                            user_item_matrix, idx_to_movieId, k)
 
             # predictions.append([movie_id, pred_rate])
             user_rates[movie_index] = pred_rate
 
 
-    ## copying movies from numpy array to sort and pick top_n ratings
-    #for movie_index in range(len(all_movies)):
-    #    movie_id = idx_to_movieId[movie_index]
-    #    predictions.append([movie_id, user_rates[movie_index]])
+    # copying movies from numpy array to sort and pick top_n ratings
+    for movie_index in range(len(all_movies)):
+        movie_id = idx_to_movieId[movie_index]
+        predictions.append([movie_id, user_rates[movie_index]])
 
 
     # for those movies that are not in user neighbors, use average rating of all users
@@ -129,11 +127,10 @@ def recommend_one(user_index, top_n, user_similar, movies_num, user_item_matrix,
     #     if movie_index not in neighbors_movies_index:
     #         predictions.append([movie_id, mean_user_item_ratings[movie_index]])
 
-    #predictions.sort(key=lambda x: x[1], reverse=True)
+    predictions.sort(key=lambda x: x[1], reverse=True)
 
     # user_recs[user_id] = [movie[0] for movie in predictions[:top_n]]
-    #return [user_id, [movie[0] for movie in predictions[:top_n]]]
-    return [user_index, user_rates]
+    return [user_id, [movie[0] for movie in predictions[:top_n]]]
 
 
 class UserKNN():
@@ -153,8 +150,6 @@ class UserKNN():
         self.k = _k
         self.n_jobs = n_jobs
         self.has_header = has_header
-        
-        self.cov_error = 0
 
         self.user_item_matrix_low = None
 
@@ -173,18 +168,10 @@ class UserKNN():
         item = []
         if self.has_header:
             f.readline()
-            
-	self.all_movies_avg = 0.0
-	count = 0
-            
         for line in f:
             spline = line.split(',')
             user.append(int(spline[0]))
             item.append(int(spline[1]))
-            self.all_movies_avg += float(spline[2])
-            count = count + 1
-            
-        self.all_movies_avg /= float(count)
 
         self.all_users = list(set(user))
         self.all_movies = list(set(item))
@@ -208,18 +195,16 @@ class UserKNN():
             self.userId_to_idx[self.all_users[i]] = i
 
         self.user_item_matrix = np.zeros((self.user_num, self.movies_num), dtype=float)
-        
-	f = open(file_path, 'r')
         if self.has_header:
-            f.readline()
-            
+            f = open(file_path, 'r')
+        f.readline()
         for line in f:
             spline = line.split(',')
             userIndex = self.userId_to_idx[int(spline[0])]
             movieIndex = self.movieId_to_idx[int(spline[1])]
             self.user_item_matrix[userIndex, movieIndex] = float(spline[2])
 
-        # np.save(self.user_item_matrix_file_path, self.user_item_matrix)
+        # np.save(self.item_user_matrix_file_path, self.user_item_matrix)
 
 
     def user_similarity_sklearn(self, top_n):
@@ -230,14 +215,13 @@ class UserKNN():
         distances, indices = nbrs.kneighbors(self.user_item_matrix)
         user_similars = {}
         for user_idx in range(len(distances)):
-            #user_id = self.idx_to_userId[user_idx]
+            user_id = self.idx_to_userId[user_idx]
             sim_list = []
             for nei in range(1, top_n+1):
-                #nei_id = self.idx_to_userId[indices[user_idx][nei]]
-                nei_index = indices[user_idx][nei]
+                nei_id = self.idx_to_userId[indices[user_idx][nei]]
                 sim = distances[user_idx][nei]
-                sim_list.append([nei_index, sim])
-            user_similars[user_idx] = sim_list[:]
+                sim_list.append([nei_id, sim])
+            user_similars[user_id] = sim_list[:]
 
         # don't save user_similar because we may run several instances of these in parallel.
         # only return these values
@@ -246,130 +230,11 @@ class UserKNN():
         return user_similars
 
 
-    def predict(self, user_id, movie_id, user_similar):
-        movie_error_flag = False
-        user_error_flag = False
-	
-	# Dealing with movie coverage error
-	try:
-	   movie_index = self.movieId_to_idx[movie_id]
-	except KeyError:
-	   movie_error_flag = True
-	
-	
-	
-	# Dealing with user coverage error
-	try:
-	   user_index = self.userId_to_idx[user_id]
-	except:
-	   movie_error_flag = True
-	
-	
-	
-	if movie_error_flag == True:
-	   self.cov_error = self.cov_error + 1
-	   #try:
-	   #    print 'Movie Coverage Error'
-	   #except:
-	   #    pass
-	       
-	   return self.all_movies_avg
-	   #return 'Movie Coverage Error'
-	elif user_error_flag == True:
-	   self.cov_error = self.cov_error + 1
-	   #try:
-	   #    print 'User Coverage Error'
-	   #except:
-	   #    pass
-	       
-	   return self.all_movies_avg
-	   #return 'User Coverage Error'
-	else:
-	   #try:
-	   #    print 'movie_index', movie_index
-	   #    print 'user index', user_index
-	   #except:
-	   #    pass
-	   
-	   
-	   rating = predict_par(user_similar, movie_index, user_index, self.user_item_matrix, self.k)
-	   if rating == 0:
-	       self.cov_error = self.cov_error + 1
-	       
-	       # mean ratings of this item based on user-item index
-	       mean_rating_item = np.mean(self.user_item_matrix[movie_index][self.user_item_matrix[movie_index].nonzero()[0]])
-	       
-	       # print self.user_item_matrix[self.user_item_matrix[movie_index].nonzero()]
-	       #print 'This is average rating.'
-	       return mean_rating_item
-	   return rating
-        
-    def root_mean_squared_error(self, test_file_path, has_header, user_similar, out_file_eval = ""):
-        print ("Computing Root Mean Squared Error...")
-        
-        # Reading Testing Data Set File
-        f = open(test_file_path, "r")
-        
-        if has_header:
-            f.readline()
-        
-        inFile = f.readlines()
-        
-        f.close()
-        
-        
-        rmse_sum = 0.0 # sum of the squared difference between observed and predicted ratings
-        mae_sum = 0.0 # sum of the posite diference between observed and predicted ratings
-        n = 0 # conunting number of ratings in training set
-        
-		# Predicting a rating for all entries into testing dataset
-        for i in range(len(inFile)):
-            inFile[i] = inFile[i].split(",")
-            
-            # Converting data to the proper data type
-            for j in range(len(inFile[i]) - 1):
-                inFile[i][j] = int(inFile[i][j])
-            inFile[i][2] = float(inFile[i][2])
-            
-            # Getting prediction given a user and an item
-            inFile[i].append(self.predict(inFile[i][0], inFile[i][1], user_similar))
-            
-            # RMSE summing
-            rmse_sum += ((inFile[i][3] - inFile[i][2]) * (inFile[i][3] - inFile[i][2]))
-            
-            # MAE summing
-            mae_sum += math.fabs(inFile[i][3] - inFile[i][2])
-            
-            # counting
-            n = n + 1
-        
-        rmse = math.sqrt(rmse_sum / float(n)) # RMSE
-        
-        mae = mae_sum / float(n) # MAE
-        
-        coverage = (float(n) - float(self.cov_error)) / float(n) # Coverage
-        
-	# Writing fold evaluation on file
-	if out_file_eval != "":
-            f = open(out_file_eval, "w")
-  		
-            f.write("RMSE:,{}\n".format(rmse))
-            f.write("MAE:,{}\n".format(mae))
-            #print ("Number of inaccurate predictions: {}".format(self.cov_error))
-            #print ("Number of prediction attempts: {}".format(n))
-            f.write("Coverage:,{}\n".format(coverage))
-  		
-            f.write("userId,movieId,rating, pred_rating\n")
-            
-            for i in inFile:
-                for j in range(len(i)):
-                    i[j] = str(i[j])
-                f.write(",".join(i))
-                f.write("\n")
-            
-            f.close()
-        
-        return (rmse, mae, coverage)
+    def predict(self, user_id, movie_id, item_similar):
+        movie_index = self.movieId_to_idx[movie_id]
+        user_index = self.idx_to_userId[user_id]
+
+        return predict_par(item_similar, movie_index, user_index, self.user_item_matrix)
 
 
 
@@ -413,7 +278,7 @@ class UserKNN():
     #     return pred_rate
 
 
-    def compute_similarity_matrix(self, low_dim, top_n, is_sim_infile, is_use_low_dim, is_sklearn_kNN_sim, user_similar_file_path = ""):
+    def compute_similarity_matrix(self, low_dim, top_n, is_sim_infile, is_use_low_dim, is_sklearn_kNN_sim):
         """
         :param low_dim:
             indicates the size of low dimension for user-item matrix .The low dimension
@@ -426,7 +291,7 @@ class UserKNN():
         :return:
         """
 
-        #user_similar = None
+        user_similar = None
 
         if not is_sim_infile:
             # print 'Creating user-item matrix(numpy array)...'
@@ -434,9 +299,9 @@ class UserKNN():
 
             if is_use_low_dim:
                 print 'get a lower dimension of user-item matrix for similarity using SVD...'
-                raise Exception("Implementation of SVD for dimensionality reduction has removed!!")
                 # self.user_item_matrix_low = low_dim_similarity.user_svd(self.user_item_matrix,
                 #                                                         low_dim)
+                raise Exception("Implementation of SVD for dimensionality reduction has removed!!")
             else:
                 self.user_item_matrix_low = self.user_item_matrix
 
@@ -447,12 +312,11 @@ class UserKNN():
 
             else:
                 print 'Computing user-user similarity...'
-                raise Exception('No implementation for user-user similarity!! use sklearn kNN!!')
                 # self.user_similarity(top_n)
-        else:
-            print 'Loading user-user similarity from file...'
-            #raise Exception('Nothing saved!! We do NOT save anything in file in this implementation.')
-            user_similar = pkl.load(open(user_similar_file_path, 'rb'))
+                raise Exception('No implementation for user-user similarity!! use sklearn kNN!!')
+
+        # print 'Loading user-user similarity from file...'
+        # user_similar = pkl.load(open(self.user_similar_file_path, 'rb'))
 
         return user_similar
 
