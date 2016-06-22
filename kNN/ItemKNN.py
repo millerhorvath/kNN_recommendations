@@ -2,7 +2,6 @@ import numpy as np
 import cPickle as pkl
 import random
 import time
-import math
 from numpy import linalg as LA
 from sklearn.neighbors import NearestNeighbors
 from joblib import Parallel, delayed
@@ -162,10 +161,10 @@ class ItemKNN():
         # self.item_user_matrix = None
         self.item_user_matrix_low = None
 
-        self.data_path = 'Diversity_2/item_knn/'
-        self.item_similar_file_path = self.data_path + 'item_similarity_matrix.pkl'
-        self.user_recs_file_path = self.data_path + 'user_recs.pkl'
-        self.item_user_matrix_file_path = self.data_path + 'item_user_matrix'
+        #self.data_path = 'Diversity_2/item_knn/'
+        #self.item_similar_file_path = self.data_path + 'item_similarity_matrix.pkl'
+        #self.user_recs_file_path = self.data_path + 'user_recs.pkl'
+        #self.item_user_matrix_file_path = self.data_path + 'item_user_matrix'
 
         # Creating item-user matrix
         self.__read_data_into_matrix__(rating_file_path)
@@ -285,7 +284,7 @@ class ItemKNN():
 	       return mean_rating_item
 	   return rating
         
-    def root_mean_squared_error(self, test_file_path, has_header, out_file_eval, item_similar):
+    def root_mean_squared_error(self, test_file_path, has_header, item_similar, out_file_eval = ""):
         print ("Computing Root Mean Squared Error...")
         
         # Reading Testing Data Set File
@@ -330,24 +329,25 @@ class ItemKNN():
         
         coverage = (float(n) - float(self.cov_error)) / float(n) # Coverage
         
-		# Writing fold evaluation on file
-        f = open(out_file_eval, "w")
-		
-        f.write("RMSE:,{}\n".format(rmse))
-        f.write("MAE:,{}\n".format(mae))
-        #print ("Number of inaccurate predictions: {}".format(self.cov_error))
-        #print ("Number of prediction attempts: {}".format(n))
-        f.write("Coverage:,{}\n".format(coverage))
-		
-        f.write("userId,movieId,rating, pred_rating\n")
-        
-        for i in inFile:
-            for j in range(len(i)):
-                i[j] = str(i[j])
-            f.write(",".join(i))
-            f.write("\n")
-        
-        f.close()
+	# Writing fold evaluation on file
+	if out_file_eval != "":
+            f = open(out_file_eval, "w")
+  		
+            f.write("RMSE:,{}\n".format(rmse))
+            f.write("MAE:,{}\n".format(mae))
+            #print ("Number of inaccurate predictions: {}".format(self.cov_error))
+            #print ("Number of prediction attempts: {}".format(n))
+            f.write("Coverage:,{}\n".format(coverage))
+  		
+            f.write("userId,movieId,rating, pred_rating\n")
+            
+            for i in inFile:
+                for j in range(len(i)):
+                    i[j] = str(i[j])
+                f.write(",".join(i))
+                f.write("\n")
+            
+            f.close()
         
         return (rmse, mae, coverage)
 
